@@ -16,20 +16,25 @@ class Img2ColConvFunction(torch.autograd.Function):
         N, C_in, H, W = X.shape
         C_out, _, kernel_h, kernel_w = weight.shape
 
-        H_out = (H + 2 * padding - kernel_h) // stride + 1
-        W_out = (W + 2 * padding - kernel_w) // stride + 1
+        if isinstance(padding, int):
+            ph, pw = padding, padding
+        else:
+            ph, pw = padding
+        if isinstance(stride, int):
+            sh, sw = stride, stride
+        else:
+            sh, sw = stride
 
-        if padding > 0:
+        H_out = (H + 2 * ph - kernel_h) // sh + 1
+        W_out = (W + 2 * pw - kernel_w) // sw + 1
+
+        if ph > 0 or pw > 0:
             if padding_mode == "zeros":
-                X_padded = F.pad(X, (padding, padding, padding, padding))
+                X_padded = F.pad(X, (pw, pw, ph, ph))
             elif padding_mode == "reflect":
-                X_padded = F.pad(
-                    X, (padding, padding, padding, padding), mode="reflect"
-                )
+                X_padded = F.pad(X, (pw, pw, ph, ph), mode="reflect")
             elif padding_mode == "replicate":
-                X_padded = F.pad(
-                    X, (padding, padding, padding, padding), mode="replicate"
-                )
+                X_padded = F.pad(X, (pw, pw, ph, ph), mode="replicate")
             else:
                 raise NotImplementedError(
                     f"Padding mode {padding_mode} not implemented"
@@ -37,7 +42,7 @@ class Img2ColConvFunction(torch.autograd.Function):
         else:
             X_padded = X
 
-        patches = X_padded.unfold(2, kernel_h, stride).unfold(3, kernel_w, stride)
+        patches = X_padded.unfold(2, kernel_h, sh).unfold(3, kernel_w, sw)
         patches_reshaped = patches.permute(0, 2, 3, 1, 4, 5).contiguous()
         patches_reshaped = patches_reshaped.view(N * H_out * W_out, -1)
 
@@ -59,8 +64,18 @@ class Img2ColConvFunction(torch.autograd.Function):
 
         N, C_in, H, W = X.shape
         C_out, _, kernel_h, kernel_w = weight.shape
-        H_out = (H + 2 * padding - kernel_h) // stride + 1
-        W_out = (W + 2 * padding - kernel_w) // stride + 1
+
+        if isinstance(padding, int):
+            ph, pw = padding, padding
+        else:
+            ph, pw = padding
+        if isinstance(stride, int):
+            sh, sw = stride, stride
+        else:
+            sh, sw = stride
+
+        H_out = (H + 2 * ph - kernel_h) // sh + 1
+        W_out = (W + 2 * pw - kernel_w) // sw + 1
 
         grad_output_reshaped = (
             grad_output.permute(0, 2, 3, 1).contiguous().view(N * H_out * W_out, C_out)
@@ -71,21 +86,17 @@ class Img2ColConvFunction(torch.autograd.Function):
         else:
             grad_bias = None
 
-        if padding > 0:
+        if ph > 0 or pw > 0:
             if padding_mode == "zeros":
-                X_padded = F.pad(X, (padding, padding, padding, padding))
+                X_padded = F.pad(X, (pw, pw, ph, ph))
             elif padding_mode == "reflect":
-                X_padded = F.pad(
-                    X, (padding, padding, padding, padding), mode="reflect"
-                )
+                X_padded = F.pad(X, (pw, pw, ph, ph), mode="reflect")
             elif padding_mode == "replicate":
-                X_padded = F.pad(
-                    X, (padding, padding, padding, padding), mode="replicate"
-                )
+                X_padded = F.pad(X, (pw, pw, ph, ph), mode="replicate")
         else:
             X_padded = X
 
-        patches = X_padded.unfold(2, kernel_h, stride).unfold(3, kernel_w, stride)
+        patches = X_padded.unfold(2, kernel_h, sh).unfold(3, kernel_w, sw)
         patches_reshaped = (
             patches.permute(0, 2, 3, 1, 4, 5).contiguous().view(N * H_out * W_out, -1)
         )
@@ -108,14 +119,14 @@ class Img2ColConvFunction(torch.autograd.Function):
         fold = torch.nn.Fold(
             output_size=(X_padded.shape[2], X_padded.shape[3]),
             kernel_size=(kernel_h, kernel_w),
-            stride=stride,
+            stride=(sh, sw),
             padding=0,
             dilation=1,
         )
         grad_input_padded = fold(grad_patches_flat)
 
-        if padding > 0:
-            grad_input = grad_input_padded[:, :, padding:-padding, padding:-padding]
+        if ph > 0 or pw > 0:
+            grad_input = grad_input_padded[:, :, ph:-ph, pw:-pw]
         else:
             grad_input = grad_input_padded
 
@@ -142,10 +153,12 @@ class Conv2dImg2Col(nn.Module):
         self.padding = padding
         self.padding_mode = padding_mode
 
-        if isinstance(kernel_size, int):
-            self.kernel_size = (kernel_size, kernel_size)
-        else:
-            self.kernel_size = kernel_size
+        if isinstance(self.kernel_size, int):
+            self.kernel_size = (self.kernel_size, self.kernel_size)
+        if isinstance(self.stride, int):
+            self.stride = (self.stride, self.stride)
+        if isinstance(self.padding, int):
+            self.padding = (self.padding, self.padding)
 
         kernel_h, kernel_w = self.kernel_size
 
@@ -177,7 +190,7 @@ class Conv2dImg2Col(nn.Module):
             "{in_channels}, {out_channels}, kernel_size={kernel_size}"
             ", stride={stride}"
         )
-        if self.padding != 0:
+        if self.padding != (0, 0):
             s += ", padding={padding}"
         if self.bias is None:
             s += ", bias=False"
@@ -212,7 +225,7 @@ def test_custom_conv_layer():
     print("\n=== Тестирование обратного прохода и обучения ===")
 
     custom_conv_train = Conv2dImg2Col(
-        3, 16, kernel_size=3, stride=1, padding=1, bias=True
+        3, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=True
     )
     standard_conv_train = nn.Conv2d(
         3, 16, kernel_size=3, stride=1, padding=1, bias=True
