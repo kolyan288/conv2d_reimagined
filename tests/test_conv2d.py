@@ -200,6 +200,17 @@ def test_custom_conv_layer():
         is_equal = torch.allclose(out_custom, out_standard, atol=1e-6)
         print(f"Config in={in_ch}, out={out_ch}, k={k}, s={s}, p={p}: {is_equal}")
 
+def test_torch_trace():
+    model = nn.Sequential(
+        Conv2dImg2Col(3, 16, kernel_size=3, stride=1, padding=1, bias=True)
+    )
+    input = torch.randn(2, 3, 8, 8, requires_grad=True)
+    torch.jit.trace(model, input)
+    print(f"Trace passed .... \n")
+    # torch.jit.script(model)
+    # print(f"Scripting passed .... \n")
 
 if __name__ == "__main__":
+    test_torch_trace()
     test_custom_conv_layer()
+    
