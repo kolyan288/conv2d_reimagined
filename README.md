@@ -91,6 +91,10 @@ from src.models.dummy import DummyModel
 * Прунинг. Методы: Structured pruning
 * Квантование. Методы: ... 
 
+#### Результаты экспериментов:
+
+coming soon...
+
 ### Воспроизведение результатов
 
 coming soon...
