@@ -18,7 +18,14 @@ else
         pip3 uninstall numpy -y
         pip3 install numpy==1.26.0
 fi
-
+git clone https://github.com/alexgkendall/SegNet-Tutorial /workspaces/conv2d_reimagined/data
+pip install lightning albumentations
+pip install pillow 
+pip install timm --no-dependencies
+pip install torchvision==0.16.2
+pip install matplotlib
+pip install segmentation-models-pytorch 
+pip3 install numpy==1.26.0
 pip install onnx onnxsim 
 # pip install tensorrt
 
