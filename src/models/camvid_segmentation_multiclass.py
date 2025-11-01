@@ -12,10 +12,25 @@ import os
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset as BaseDataset
+from typing import Literal
+from torch.quantization.quantize_fx import prepare_fx
 
-
+AVAILABLE_AMP = Literal["01", "02"]
 EPOCHS = 50
 
+# def patched_forward(self, x):
+#     """Sequentially pass `x` trough model`s encoder, decoder and heads"""
+
+#     features = self.encoder(x)
+#     decoder_output = self.decoder(features)
+
+#     masks = self.segmentation_head(decoder_output)
+
+#     if self.classification_head is not None:
+#         labels = self.classification_head(features[-1])
+#         return masks, labels
+
+#     return masks
 
 class CamVidModel(pl.LightningModule):
     def __init__(self, arch, encoder_name, in_channels, out_classes, **kwargs):
@@ -27,6 +42,7 @@ class CamVidModel(pl.LightningModule):
             classes=out_classes,
             **kwargs,
         )
+        self._is_prepared = False
 
         # Preprocessing parameters for image normalization
         params = smp.encoders.get_preprocessing_params(encoder_name)
@@ -59,8 +75,20 @@ class CamVidModel(pl.LightningModule):
     def forward(self, image):
         # Normalize image
         image = (image - self.mean) / self.std
-        mask = self.forward_model(image)
+        # mask = self.forward_model(image)
+        mask = self.model(image)
         return mask
+    
+    def setup_qat(self, example_input, qconfig_mapping):
+        """Apply QAT preparation to the underlying model"""
+        if not self._is_prepared:
+            self.model = prepare_fx(
+                model=self.model,
+                qconfig_mapping=qconfig_mapping,
+                example_inputs=(example_input,),
+            )
+            self._is_prepared = True
+        return self
 
     def shared_step(self, batch, stage):
         image, mask = batch
@@ -374,26 +402,52 @@ def visualize_data(x_train_dir, y_train_dir):
         visualize(image=image, mask=mask)
 
 
-def train_val(model, train_loader, valid_loader, test_loader, max_epochs=EPOCHS):
-    trainer = pl.Trainer(max_epochs=max_epochs, log_every_n_steps=1)
-    trainer.fit(
-        model,
-        train_dataloaders=train_loader,
-        val_dataloaders=valid_loader,
-    )
+def train_val(
+    model,
+    train_loader,
+    valid_loader,
+    test_loader,
+    max_epochs=EPOCHS,
+    fp16 = False,
+    train = True,
+    log_every_n_steps=1,
+    test = False,
+    callbacks = None
+   
+):
+    if fp16:
+        trainer = pl.Trainer(
+            max_epochs=max_epochs,
+            log_every_n_steps=log_every_n_steps,
+            precision=16, callbacks=callbacks
+        )
+
+    else:
+        trainer = pl.Trainer(max_epochs=max_epochs, log_every_n_steps=log_every_n_steps, callbacks=callbacks)
+    """
+    O1 and O2 are different implementations of mixed precision. Try both, and see what gives the best speedup and accuracy for your model.
+    """
+    if train:
+        trainer.fit(
+            model,
+            train_dataloaders=train_loader,
+            val_dataloaders=valid_loader,
+        )
 
     # run validation dataset
     valid_metrics = trainer.validate(model, dataloaders=valid_loader, verbose=False)
     print(valid_metrics)
 
     # run test dataset
-    test_metrics = trainer.test(model, dataloaders=test_loader, verbose=False)
-    print(test_metrics)
-    return valid_metrics, test_metrics
+    test_metrics = None
+    if test:
+        test_metrics = trainer.test(model, dataloaders=test_loader, verbose=False)
+        print(test_metrics)
+    return valid_metrics, test_metrics, trainer
 
 
 def get_dataloaders(
-    x_train_dir, y_train_dir, x_valid_dir, y_valid_dir, x_test_dir, y_test_dir, bs = 32
+    x_train_dir, y_train_dir, x_valid_dir, y_valid_dir, x_test_dir, y_test_dir, bs=32
 ):
     train_dataset = Dataset(
         x_train_dir,
@@ -425,6 +479,7 @@ def get_dataloaders(
 def save_load_torch_model(model, path="camvid_model_fp32.pth", save=True):
 
     if save:
+        model.eval()
         torch.save(model.state_dict(), path)
     else:
         model.load_state_dict(torch.load(path))

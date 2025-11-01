@@ -10,6 +10,7 @@ from torch.quantization.fuser_method_mappings import fuse_conv_bn
 from torch.ao.quantization import get_default_qat_qconfig_mapping
 from src.models.dummy import DummyModel
 
+
 torch.quantization.fuser_method_mappings._DEFAULT_OP_LIST_TO_FUSER_METHOD.update(
     {(Conv2dImg2Col, nn.BatchNorm2d): fuse_conv_bn}
 )
@@ -44,10 +45,8 @@ def setup_qat_for_model(model, example_input, config = None):
     """
     Apply QAT to the model with custom configuration
     """
-    # model = QAT(model)
-    # model.qconfig = torch.quantization.get_default_qconfig("x86")  # ("qnnpack")
-    # torch.quantization.prepare_qat(model, inplace=True)
-    model = prepare_fx(  # d prepare_fx  prepare_qat_fx
+
+    model = prepare_fx( 
         model=model,
         qconfig_mapping=QCONFIG_MAPPING if config is None else config,
         example_inputs=(example_input, ),
