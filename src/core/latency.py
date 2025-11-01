@@ -113,6 +113,7 @@ def latency_gpu(model, test_input=None, warmup_n=10, benchmark_n=100):
         print(
             "Start GPU benchmark with input shape:", test_input.shape, test_input.device
         )
+        torch.cuda.empty_cache()
         torch.cuda.synchronize()
 
         for i in range(benchmark_n):
@@ -140,5 +141,6 @@ def latency_gpu(model, test_input=None, warmup_n=10, benchmark_n=100):
         std_ms = times.std()
 
     print(f"{mean_ms:.3f}ms +- {std_ms:.3f}ms")
+    torch.cuda.empty_cache()
     return mean_ms, std_ms
 

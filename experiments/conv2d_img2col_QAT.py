@@ -18,42 +18,6 @@ QCONFIG_MAPPING = get_default_qat_qconfig_mapping("x86")
 # QCONFIG_MAPPING = get_default_qat_qconfig_mapping("qnnpack")
 
 
-class QAT(nn.Module):
-
-    def __init__(self, model):
-        super().__init__()
-        print("Wrapping model with QuantStub and DeQuantStub ...")
-        self.model = model
-        self.quant = torch.quantization.QuantStub()
-        self.de_quant = torch.quantization.DeQuantStub()
-
-        # self.nc = self.model.head.nc
-        # self.no = self.model.head.no
-        # self.stride = self.model.stride
-
-    def forward(self, x):
-        x = self.quant(x)
-        x = self.model(x)
-
-        # for i in range(len(x)):
-        #     x[i] = self.de_quant(x[i])
-        return self.de_quant(x)
-
-
-
-def setup_qat_for_model(model, example_input, config = None):
-    """
-    Apply QAT to the model with custom configuration
-    """
-    # model = QAT(model)
-    # model.qconfig = torch.quantization.get_default_qconfig("x86")  # ("qnnpack")
-    # torch.quantization.prepare_qat(model, inplace=True)
-    model = prepare_fx(  # d prepare_fx  prepare_qat_fx
-        model=model,
-        qconfig_mapping=QCONFIG_MAPPING if config is None else config,
-        example_inputs=(example_input, ),
-    )
-    return model
 
 
 def train_step(model, data, target, optimizer, criterion):

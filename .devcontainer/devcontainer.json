@@ -23,5 +23,5 @@
         
     "remoteEnv" : {"PLATFORM" : "gpu"},
     "runArgs": ["--gpus", "all", "--net=host", "--privileged"], // ,  "-p=4151:4151" "--net=host",
-    "postStartCommand" : ["/bin/sh","setup/setup-gpu.sh"] //  ["/bin/sh","-c", "pwd > log_pwd.txt"]
+    "postStartCommand" : ["/bin/sh","setup/setup-gpu.sh"] 
 }
