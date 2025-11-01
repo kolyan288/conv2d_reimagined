@@ -32,6 +32,7 @@ class LatencyMetricsWriter:
                         "test_iou",
                         "device",
                         "notes",
+                        "sparsity"
                     ]
                 )
 
@@ -54,6 +55,7 @@ class LatencyMetricsWriter:
         notes: str = "",
         val_iou: Optional[float] = None,
         test_iou: Optional[float] = None,
+        sparsity : Optional[Dict[str, Any]] = None,
     ):
         """Record latency metrics to CSV"""
 
@@ -81,11 +83,12 @@ class LatencyMetricsWriter:
             "latency_cpu_ms": latency_cpu_ms,
             "latency_gpu_mean_ms": latency_gpu_mean_ms,
             "latency_gpu_std_ms": latency_gpu_std_ms,
+            "total_params": total_params,
             "val_iou": val_iou,
             "test_iou": test_iou,
-            "total_params": total_params,
             "device": "cuda",
             "notes": notes,
+            "sparsity": str(sparsity) if sparsity else "",
         }
 
         # Append to CSV
