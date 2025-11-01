@@ -27,7 +27,7 @@ pip install matplotlib pandas
 pip install segmentation-models-pytorch 
 pip3 install numpy==1.26.0
 pip3 install typing-extensions==4.15.0
-pip install onnx onnxsim 
+pip install onnx onnxsim seaborn
 # pip install tensorrt
 
 
