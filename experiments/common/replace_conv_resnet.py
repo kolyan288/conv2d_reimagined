@@ -8,6 +8,7 @@ def replace_conv2d_with_custom(module, custom_conv_class=Conv2dImg2Col):
 
     for name, child in module.named_children():
         if isinstance(child, nn.Conv2d):
+            groups = getattr(child, "groups", 1)
 
             custom_conv = custom_conv_class(
                 in_channels=child.in_channels,
@@ -19,6 +20,7 @@ def replace_conv2d_with_custom(module, custom_conv_class=Conv2dImg2Col):
                 padding_mode=(
                     child.padding_mode if hasattr(child, "padding_mode") else "zeros"
                 ),
+                groups=groups,
             )
 
             with torch.no_grad():
