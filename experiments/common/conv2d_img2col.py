@@ -93,6 +93,15 @@ class Img2ColConvFunction(torch.autograd.Function):
         padding_mode = ctx.padding_mode
         groups = ctx.groups
 
+        original_dtype = grad_output.dtype
+    
+        if original_dtype == torch.float16:
+            grad_output = grad_output.float()
+            X = X.float()
+            weight = weight.float()
+            if bias is not None:
+                bias = bias.float()
+
         N, C_in, H, W = X.shape
         C_out, C_in_per_group, kernel_h, kernel_w = weight.shape
 
@@ -251,7 +260,17 @@ class Conv2dImg2Col(nn.Module):
             nn.init.uniform_(self.bias, -bound, bound)
 
     def forward(self, x):
-        return Img2ColConvFunction.apply(x, self.weight, self.bias, self.stride, self.padding, self.padding_mode, self.groups)
+        original_dtype = x.dtype
+        if original_dtype == torch.float16:
+            x = x.float()
+            weight = self.weight.float()
+            bias = self.bias.float() if self.bias is not None else None
+        else:
+            weight = self.weight
+            bias = self.bias
+        
+        output = Img2ColConvFunction.apply(x, weight, bias, self.stride, self.padding, self.padding_mode, self.groups)
+        return output.to(original_dtype)
 
     def extra_repr(self):
         s = (
