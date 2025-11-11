@@ -45,10 +45,15 @@ def setup_qat_for_model(model, example_input, config = None):
     """
     Apply QAT to the model with custom configuration
     """
+    import torch._dynamo as dynamo
+    # very dirty trick to work with CamVid model =(
+    old = dynamo.is_compiling
+    dynamo.is_compiling = lambda : True
 
     model = prepare_fx( 
         model=model,
         qconfig_mapping=QCONFIG_MAPPING if config is None else config,
         example_inputs=(example_input, ),
     )
+    dynamo.is_compiling = old
     return model
