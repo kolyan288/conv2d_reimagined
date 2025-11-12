@@ -57,10 +57,6 @@ class Img2ColConvFunction(torch.autograd.Function):
                 patches_reshaped = patches.permute(0, 2, 3, 1, 4, 5).contiguous()
                 patches_reshaped = patches_reshaped.view(N * H_out * W_out, -1)
                 weight_reshaped = weight_group.contiguous().view(-1, C_in_per_group * kernel_h * kernel_w)
-                assert patches_reshaped.size(1) == weight_reshaped.size(
-                    1
-                ), f"Group {g} shape mismatch: patches {patches_reshaped.shape} vs weights {weight_reshaped.shape}"
-
                 output_group = torch.mm(patches_reshaped, weight_reshaped.t())
                 output_groups.append(output_group)
 
@@ -72,11 +68,6 @@ class Img2ColConvFunction(torch.autograd.Function):
             patches_reshaped = patches_reshaped.view(N * H_out * W_out, -1)
 
             weight_reshaped = weight.view(C_out, -1)
-
-            assert patches_reshaped.size(1) == weight_reshaped.size(
-                1
-            ), f"Shape mismatch: patches {patches_reshaped.shape} vs weights {weight_reshaped.shape}"
-
             output = torch.mm(patches_reshaped, weight_reshaped.t())
 
         if bias is not None:
@@ -260,17 +251,7 @@ class Conv2dImg2Col(nn.Module):
             nn.init.uniform_(self.bias, -bound, bound)
 
     def forward(self, x):
-        original_dtype = x.dtype
-        if original_dtype == torch.float16:
-            x = x.float()
-            weight = self.weight.float()
-            bias = self.bias.float() if self.bias is not None else None
-        else:
-            weight = self.weight
-            bias = self.bias
-        
-        output = Img2ColConvFunction.apply(x, weight, bias, self.stride, self.padding, self.padding_mode, self.groups)
-        return output.to(original_dtype)
+        return Img2ColConvFunction.apply(x, self.weight, self.bias, self.stride, self.padding, self.padding_mode, self.groups)
 
     def extra_repr(self):
         s = (
