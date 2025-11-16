@@ -82,12 +82,16 @@ class CamVidModel(pl.LightningModule):
     def setup_qat(self, example_input, qconfig_mapping):
         """Apply QAT preparation to the underlying model"""
         if not self._is_prepared:
+            import torch._dynamo as dynamo
+            old = dynamo.is_compiling
+            dynamo.is_compiling = lambda : True
             self.model = prepare_fx(
                 model=self.model,
                 qconfig_mapping=qconfig_mapping,
                 example_inputs=(example_input,),
             )
             self._is_prepared = True
+            dynamo.is_compiling = old
         return self
 
     def shared_step(self, batch, stage):
@@ -331,10 +335,12 @@ def get_validation_augmentation():
 def visualize_sample(
     model,
     test_loader,
+    images = None, masks = None
 ):
 
     # Fetch a batch from the test loader
-    images, masks = next(iter(test_loader))
+    if images is None:
+        images, masks = next(iter(test_loader))
 
     # Switch the model to evaluation mode
     with torch.inference_mode():
@@ -351,7 +357,7 @@ def visualize_sample(
     # Visualize a few samples (image, ground truth mask, and predicted mask)
     for idx, (image, gt_mask, pr_mask) in enumerate(zip(images, masks, pr_masks)):
         if idx <= 4:  # Visualize first 5 samples
-            plt.figure(figsize=(12, 6))
+            plt.figure(figsize=(20, 6))
 
             # Original Image
             plt.subplot(1, 3, 1)
@@ -412,18 +418,20 @@ def train_val(
     train = True,
     log_every_n_steps=1,
     test = False,
-    callbacks = None
+    callbacks = None,
+    force_cpu = False
    
 ):
+    accelerator = "cpu" if force_cpu else "auto"
     if fp16:
         trainer = pl.Trainer(
             max_epochs=max_epochs,
             log_every_n_steps=log_every_n_steps,
-            precision=16, callbacks=callbacks
+            precision=16, callbacks=callbacks, accelerator=accelerator
         )
 
     else:
-        trainer = pl.Trainer(max_epochs=max_epochs, log_every_n_steps=log_every_n_steps, callbacks=callbacks)
+        trainer = pl.Trainer(max_epochs=max_epochs, log_every_n_steps=log_every_n_steps, callbacks=callbacks, accelerator=accelerator)
     """
     O1 and O2 are different implementations of mixed precision. Try both, and see what gives the best speedup and accuracy for your model.
     """
