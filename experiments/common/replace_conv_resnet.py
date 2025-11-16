@@ -1,13 +1,14 @@
 import torch
 import torch.nn as nn
-from torchvision.models import resnet18
-from conv2d_img2col import Conv2dImg2Col
+
+from experiments.common.conv2d_img2col import Conv2dImg2Col
 
 
 def replace_conv2d_with_custom(module, custom_conv_class=Conv2dImg2Col):
 
     for name, child in module.named_children():
         if isinstance(child, nn.Conv2d):
+            groups = getattr(child, "groups", 1)
 
             custom_conv = custom_conv_class(
                 in_channels=child.in_channels,
@@ -19,6 +20,7 @@ def replace_conv2d_with_custom(module, custom_conv_class=Conv2dImg2Col):
                 padding_mode=(
                     child.padding_mode if hasattr(child, "padding_mode") else "zeros"
                 ),
+                groups=groups,
             )
 
             with torch.no_grad():
@@ -30,28 +32,30 @@ def replace_conv2d_with_custom(module, custom_conv_class=Conv2dImg2Col):
         else:
             replace_conv2d_with_custom(child, custom_conv_class)
 
+def main():
+    # import placed here to avoid downloading resnet 18 when this file is imported
+    from torchvision.models import resnet18
+    model = resnet18(pretrained=True)
+    model.eval()
 
-model = resnet18(pretrained=True)
-model.eval()
+    original_model = resnet18(pretrained=True)
+    original_model.eval()
 
-original_model = resnet18(pretrained=True)
-original_model.eval()
+    replace_conv2d_with_custom(model)
 
-replace_conv2d_with_custom(model)
+    print("=== Проверка замены слоев ===")
+    for name, module in model.named_modules():
+        if isinstance(module, Conv2dImg2Col):
+            print(f"Заменен слой: {name} -> {module}")
 
-print("=== Проверка замены слоев ===")
-for name, module in model.named_modules():
-    if isinstance(module, Conv2dImg2Col):
-        print(f"Заменен слой: {name} -> {module}")
+    x = torch.randn(1, 3, 224, 224)
 
-x = torch.randn(1, 3, 224, 224)
+    with torch.no_grad():
+        output_custom = model(x)
+        output_original = original_model(x)
 
-with torch.no_grad():
-    output_custom = model(x)
-    output_original = original_model(x)
+    print(f"Shape custom model output: {output_custom.shape}")
+    print(f"Shape original model output: {output_original.shape}")
+    print(f"Outputs are close: {torch.allclose(output_custom, output_original, atol=1e-5)}")
 
-print(f"Shape custom model output: {output_custom.shape}")
-print(f"Shape original model output: {output_original.shape}")
-print(f"Outputs are close: {torch.allclose(output_custom, output_original, atol=1e-5)}")
-
-# torch.save(model.state_dict(), 'resnet18_custom_conv.pth')
+    # torch.save(model.state_dict(), 'resnet18_custom_conv.pth')

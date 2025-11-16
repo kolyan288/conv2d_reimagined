@@ -3,7 +3,7 @@ FROM nvidia/cuda:12.6.2-cudnn-runtime-ubuntu22.04
 RUN apt-get update && apt-get -y install sudo && apt-get install build-essential -y --no-install-recommends gcc
 RUN apt-get update && apt-get install ffmpeg libsm6 libxext6 git -y 
 RUN sudo apt install net-tools && apt-get install vim -y
-RUN sudo apt-get install -y libnvinfer-bin
+RUN sudo apt-get install libnvinfer-bin -y
 RUN apt install curl -y &&  apt install wget && apt-get install -y iputils-ping
 RUN sudo apt install iproute2 -y
 USER root
