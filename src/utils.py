@@ -15,6 +15,8 @@ def custom_conv_model(k = 1):
             nn.ReLU(),
             Conv2dImg2Col(32, 64, kernel_size=k, stride=1, padding=k//2, bias=True),
         ) 
+
+
 def basicconv_model(k = 1):
     return nn.Sequential(
             nn.Conv2d(3, 16, kernel_size=k, stride=1, padding=k//2, bias=True),
@@ -216,3 +218,228 @@ def compare_models(csv_file: str, key = 'latency_gpu_mean_ms'):
         bs_data = df[df["batch_size_from_shape"] == bs]
         avg_latency = bs_data[key].mean()
         print(f"Batch Size {bs}: {avg_latency:.2f}ms average {label_dev} latency")
+
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+import ast
+
+def setup_plotting():
+    """Initialize plotting style"""
+    plt.style.use('seaborn-v0_8')
+    sns.set_palette("husl")
+
+def extract_model_type(model_name):
+    """Extract whether model has ReplacedConv and precision type from model name"""
+    has_replaced_conv = 'ReplacedConv' in model_name
+    is_half_model = model_name.endswith('_half')
+    base_name = model_name.replace('ReplacedConv_', '').replace('_half', '')
+    return has_replaced_conv, is_half_model, base_name
+
+def plot_latency_vs_batch_size(df):
+    """Plot latency vs batch size for different precisions and model types"""
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+    
+    # GPU Latency
+    for (precision, replaced_conv), group in df.groupby(['precision', 'has_replaced_conv']):
+        label = f"{precision} {'ReplacedConv' if replaced_conv else 'Standard'}"
+        ax1.plot(group['batch_size'], group['latency_gpu_mean_ms'], 
+                marker='o', label=label, linewidth=2)
+    
+    ax1.set_xlabel('Batch Size')
+    ax1.set_ylabel('GPU Latency (ms)')
+    ax1.set_title('GPU Latency vs Batch Size')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    
+    # CPU Latency (if available)
+    cpu_data = df.dropna(subset=['latency_cpu_ms'])
+    if not cpu_data.empty:
+        for (precision, replaced_conv), group in cpu_data.groupby(['precision', 'has_replaced_conv']):
+            label = f"{precision} {'ReplacedConv' if replaced_conv else 'Standard'}"
+            ax2.plot(group['batch_size'], group['latency_cpu_ms'], 
+                    marker='s', label=label, linewidth=2)
+        
+        ax2.set_xlabel('Batch Size')
+        ax2.set_ylabel('CPU Latency (ms)')
+        ax2.set_title('CPU Latency vs Batch Size')
+        ax2.legend()
+        ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    return fig
+
+def plot_accuracy_vs_latency(df):
+    """Plot accuracy vs latency trade-off"""
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+    
+    colors = plt.cm.Set1(np.linspace(0, 1, len(df['precision'].unique())))
+    markers = ['o', 's', '^', 'D', 'v']
+    
+    for i, (precision, precision_group) in enumerate(df.groupby('precision')):
+        marker = markers[i % len(markers)]
+        
+        for j, (replaced_conv, model_group) in enumerate(precision_group.groupby('has_replaced_conv')):
+            color = colors[i]
+            label = f"{precision} {'ReplacedConv' if replaced_conv else 'Standard'}"
+            
+            ax1.scatter(model_group['latency_gpu_mean_ms'], model_group['val_iou'],
+                       c=[color], marker=marker, s=100, label=label, alpha=0.7)
+            ax2.scatter(model_group['latency_gpu_mean_ms'], model_group['test_iou'],
+                       c=[color], marker=marker, s=100, label=label, alpha=0.7)
+    
+    ax1.set_xlabel('GPU Latency (ms)')
+    ax1.set_ylabel('Validation IoU')
+    ax1.set_title('Validation Accuracy vs Latency')
+    ax1.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax1.grid(True, alpha=0.3)
+    
+    ax2.set_xlabel('GPU Latency (ms)')
+    ax2.set_ylabel('Test IoU')
+    ax2.set_title('Test Accuracy vs Latency')
+    ax2.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    return fig
+
+def plot_accuracy_vs_latency_cpu(df):
+    """Plot accuracy vs latency trade-off"""
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+    
+    colors = plt.cm.Set1(np.linspace(0, 1, len(df['precision'].unique())))
+    markers = ['o', 's', '^', 'D', 'v']
+    
+    for i, (precision, precision_group) in enumerate(df.groupby('precision')):
+        marker = markers[i % len(markers)]
+        
+        for j, (replaced_conv, model_group) in enumerate(precision_group.groupby('has_replaced_conv')):
+            color = colors[i]
+            label = f"{precision} {'ReplacedConv' if replaced_conv else 'Standard'}"
+            
+            ax1.scatter(model_group['latency_cpu_ms'], model_group['val_iou'],
+                       c=[color], marker=marker, s=100, label=label, alpha=0.7)
+            ax2.scatter(model_group['latency_cpu_ms'], model_group['test_iou'],
+                       c=[color], marker=marker, s=100, label=label, alpha=0.7)
+    
+    ax1.set_xlabel('CPU Latency (ms)')
+    ax1.set_ylabel('Validation IoU')
+    ax1.set_title('Validation Accuracy vs Latency')
+    ax1.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax1.grid(True, alpha=0.3)
+    
+    ax2.set_xlabel('CPU Latency (ms)')
+    ax2.set_ylabel('Test IoU')
+    ax2.set_title('Test Accuracy vs Latency')
+    ax2.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    return fig
+
+def plot_precision_comparison(df, metric='latency_gpu_mean_ms'):
+    """Compare different precisions for the same model type"""
+    fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+    axes = axes.flatten()
+    
+    comparisons = [
+        ('Standard Conv', False),
+        ('ReplacedConv', True)
+    ]
+    
+    for idx, (title, replaced_conv) in enumerate(comparisons):
+        if idx >= len(axes):
+            break
+            
+        model_data = df[df['has_replaced_conv'] == replaced_conv]
+        
+        # Latency comparison
+        sns.barplot(data=model_data, x='precision', y='latency_gpu_mean_ms', 
+                   hue='batch_size', ax=axes[idx])
+        axes[idx].set_title(f'{title} - GPU Latency by Precision')
+        axes[idx].set_ylabel('Latency (ms)')
+        axes[idx].tick_params(axis='x', rotation=45)
+        
+        # Accuracy comparison
+        if idx + 2 < len(axes):
+            sns.barplot(data=model_data, x='precision', y='test_iou',
+                       hue='batch_size', ax=axes[idx + 2])
+            axes[idx + 2].set_title(f'{title} - Test IoU by Precision')
+            axes[idx + 2].set_ylabel('Test IoU')
+            axes[idx + 2].tick_params(axis='x', rotation=45)
+    
+    plt.tight_layout()
+    return fig
+
+def plot_latency_std_deviation(df):
+    """Plot latency standard deviation across different configurations"""
+    fig, ax = plt.subplots(figsize=(12, 8))
+    
+    # Create combined labels for x-axis
+    df['config'] = df['precision'] + '_' + df['batch_size'].astype(str) + '_' + df['has_replaced_conv'].astype(str)
+    
+    # Plot mean latency with error bars
+    x_pos = range(len(df))
+    ax.errorbar(x_pos, df['latency_gpu_mean_ms'], 
+                yerr=df['latency_gpu_std_ms'], 
+                fmt='o', capsize=5, capthick=2,
+                label='Mean ± Std Dev')
+    
+    ax.set_xlabel('Configuration (Precision_BatchSize_ReplacedConv)')
+    ax.set_ylabel('GPU Latency (ms)')
+    ax.set_title('GPU Latency with Standard Deviation')
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(df['config'], rotation=45, ha='right')
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+    
+    plt.tight_layout()
+    return fig
+
+def create_summary_table(df):
+    """Create a summary table of the benchmark results"""
+    summary = df.groupby(['has_replaced_conv', 'precision', 'batch_size']).agg({
+        'latency_gpu_mean_ms': 'mean',
+        'latency_gpu_std_ms': 'mean',
+        'val_iou': 'mean',
+        'test_iou': 'mean'
+    }).round(4)
+    
+    return summary
+
+# Usage example:
+def analyze_benchmark_data(csv_file_path):
+    """Main function to load and analyze benchmark data"""
+    # Load data
+    df = pd.read_csv(csv_file_path)
+    
+    # Data preprocessing
+    df['has_replaced_conv'] = df['model_name'].apply(lambda x: 'ReplacedConv' in x)
+    df['is_half_model'] = df['model_name'].apply(lambda x: x.endswith('_half'))
+    
+    # Fix potential typo
+    df['precision'] = df['precision'].replace('fp16-halp', 'fp16-half')
+    
+    # Set up plotting
+    setup_plotting()
+    
+    # Create visualizations
+    plots = {}
+    
+    plots['latency_vs_batch'] = plot_latency_vs_batch_size(df)
+    plots['accuracy_vs_latency'] = plot_accuracy_vs_latency(df)
+
+    plots['accuracy_vs_latency_cpu'] = plot_accuracy_vs_latency_cpu(df)
+    plots['precision_comparison'] = plot_precision_comparison(df)
+    plots['latency_std'] = plot_latency_std_deviation(df)
+    
+    # Create summary table
+    summary = create_summary_table(df)
+    
+    return plots, summary, df
+
+# Example usage:
+# plots, summary, processed_df = analyze_benchmark_data('your_benchmark_data.csv')
