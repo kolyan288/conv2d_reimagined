@@ -335,10 +335,12 @@ def get_validation_augmentation():
 def visualize_sample(
     model,
     test_loader,
+    images = None, masks = None
 ):
 
     # Fetch a batch from the test loader
-    images, masks = next(iter(test_loader))
+    if images is None:
+        images, masks = next(iter(test_loader))
 
     # Switch the model to evaluation mode
     with torch.inference_mode():
@@ -355,7 +357,7 @@ def visualize_sample(
     # Visualize a few samples (image, ground truth mask, and predicted mask)
     for idx, (image, gt_mask, pr_mask) in enumerate(zip(images, masks, pr_masks)):
         if idx <= 4:  # Visualize first 5 samples
-            plt.figure(figsize=(12, 6))
+            plt.figure(figsize=(20, 6))
 
             # Original Image
             plt.subplot(1, 3, 1)
