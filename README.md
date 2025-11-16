@@ -120,7 +120,39 @@ fp16 half:
 
 int8 custom cfg:
 
-<img width="544" height="460" alt="image" src="https://github.com/user-attachments/assets/0f26cb06-9f74-46e7-9f20-9f21d64bfa54" />
+<img width="320" height="320" alt="image" src="https://github.com/user-attachments/assets/0f26cb06-9f74-46e7-9f20-9f21d64bfa54" />
+
+#### Результаты экспериментов Conv2dImg2Col:
+
+<img width="1280" height="640" alt="image" src="https://github.com/user-attachments/assets/4cbf431c-f1d5-4e42-88e9-cda9da73fcc8" />
+
+int8:
+
+
+<img width="320" height="320" alt="image" src="https://github.com/user-attachments/assets/b0049aa9-7442-4f20-a89c-a1564846d72b" />
+
+
+fp32:
+
+
+<img width="320" height="320" alt="image" src="https://github.com/user-attachments/assets/a0d1351f-b987-4bd6-88e5-a48aa3c8f02f" />
+
+
+fp16:
+
+
+<img width="320" height="320" alt="image" src="https://github.com/user-attachments/assets/9f8ec3e0-3009-4541-a3b1-0cc956d6e799" />
+
+
+fp16 half:
+
+<img width="320" height="320" alt="image" src="https://github.com/user-attachments/assets/91a728f1-aa9f-4565-a01d-25c3230fb10d" />
+
+
+int8 custom cfg:
+
+<img width="320" height="320" alt="image" src="https://github.com/user-attachments/assets/d5ab23dd-8003-41df-a8d2-f413755bce4a" />
+
 
 ### Воспроизведение результатов
 
