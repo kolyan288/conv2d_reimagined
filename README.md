@@ -4,6 +4,8 @@ Effective Deep Learning Models - Conv2d Reimagined: img2col, GEMM, Sparsity &amp
 ## Обзор проекта
 Этот проект посвящён исследованию и оптимизации реализации свёрточных слоёв в нейронных сетях. Основной фокус - преобразование операции свёртки в эффективное матричное умножение с последующим применением современных методов оптимизации.
 
+Мы реализовали кастомную реализацию свёрточного слоя Conv2D в PyTorch с использованием метода img2col — классического подхода к ускорению свёрток за счёт преобразования локальных патчей изображения в столбцы матрицы. Эта реализация выполнена в виде автономной PyTorch-функции с поддержкой автоматического дифференцирования, совместимой с обучением и квантованием (QAT — Quantization-Aware Training).
+
 ## Ключевые цели:
 * Исследование классической реализации nn.Conv2d в PyTorch
 
@@ -15,21 +17,24 @@ Effective Deep Learning Models - Conv2d Reimagined: img2col, GEMM, Sparsity &amp
 
 ## Структура проекта
 ```txt
-text
+conv2d_reimagined
 ├── experiments/
 │   ├── common/
 │   │   ├── conv2d_img2col.py          # Базовая реализация Img2Col + GEMM
 │   │   └── replace_conv_resnet.py     # Утилиты замены свёрточных слоёв
 │   ├── conv2d_img2col_QAT.py          # Квантованный Img2Col (QAT)
+│   ├── quantize.ipynb                 # Эксперименты по квантизации
 │   └── [coming soon] pruning/         # Эксперименты со спарсификацией
+├── setup/
+│   └── setup-gpu.sh                   # Установка необходимых зависимостей
 ├── src/
 │   ├── core/
 │   │   └── latency.py                 # Утилиты измерения производительности
 │   ├── models/
 │   │   └── dummy.py                   # Тестовые модели для экспериментов
-│   └── [coming soon] quantization/    # Расширенные методы квантования
-├── benchmarks/                        # Скрипты для запуска бенчмарков
-├── results/                           # Результаты экспериментов
+│   └── utils.py                       # Расширенные методы квантования
+├── tests/
+│   └── test_conv2d.py                 # Тест работы модифицированного сверточного слоя
 └── README.md
 ```
 ## Реализованные компоненты
@@ -91,9 +96,31 @@ from src.models.dummy import DummyModel
 * Прунинг. Методы: Structured pruning
 * Квантование. Методы: ... 
 
-#### Результаты экспериментов:
+#### Результаты экспериментов с исходным Conv2D слоем:
 
-coming soon...
+<img width="1280" height="640" alt="image" src="https://github.com/user-attachments/assets/4cbf431c-f1d5-4e42-88e9-cda9da73fcc8" />
+
+int8:
+
+
+<img width="320" height="320" alt="image" src="https://github.com/user-attachments/assets/2f807dbf-7249-47f1-87a6-eb8123aad128" /> 
+
+fp32:
+
+
+<img width="320" height="320" alt="image" src="https://github.com/user-attachments/assets/316b4102-ed40-4aa6-8256-5d52fbe66738" />
+
+fp16:
+
+<img width="320" height="320" alt="image" src="https://github.com/user-attachments/assets/a127234d-a442-4e9d-9963-c7ea305194c9" />
+
+fp16 half:
+
+<img width="320" height="320" alt="image" src="https://github.com/user-attachments/assets/7ed617fc-f911-40f0-8969-d872878653e7" />
+
+int8 custom cfg:
+
+<img width="544" height="460" alt="image" src="https://github.com/user-attachments/assets/0f26cb06-9f74-46e7-9f20-9f21d64bfa54" />
 
 ### Воспроизведение результатов
 
