@@ -241,18 +241,47 @@ def extract_model_type(model_name):
 
 def plot_latency_vs_batch_size(df):
     """Plot latency vs batch size for different precisions and model types"""
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(25, 8))
+    
+    # Use seaborn color palette for better distinct colors
+    unique_combinations = df[['precision', 'has_replaced_conv']].drop_duplicates()
+    n_combinations = len(unique_combinations)
+    colors = sns.color_palette("husl", n_combinations)
+    
+    line_styles = ['-', '--', '-.', ':']
+    markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*']
+    
+    # Create mapping from (precision, replaced_conv) to style
+    style_map = {}
+    for idx, ((precision, replaced_conv), _) in enumerate(df.groupby(['precision', 'has_replaced_conv'])):
+        style_map[(precision, replaced_conv)] = {
+            'color': colors[idx % len(colors)],
+            'linestyle': line_styles[idx % len(line_styles)],
+            'marker': markers[idx % len(markers)],
+            'alpha': 0.8,
+            'linewidth': 1.2
+        }
     
     # GPU Latency
     for (precision, replaced_conv), group in df.groupby(['precision', 'has_replaced_conv']):
         label = f"{precision} {'ReplacedConv' if replaced_conv else 'Standard'}"
+        style = style_map[(precision, replaced_conv)]
+        
         ax1.plot(group['batch_size'], group['latency_gpu_mean_ms'], 
-                marker='o', label=label, linewidth=2)
+                label=label, 
+                marker=style['marker'],
+                linestyle=style['linestyle'],
+                color=style['color'],
+                alpha=style['alpha'],
+                linewidth=style['linewidth'],
+                markersize=6,
+                markeredgewidth=0.5,
+                markeredgecolor='white')  # White edge for better visibility
     
-    ax1.set_xlabel('Batch Size')
-    ax1.set_ylabel('GPU Latency (ms)')
-    ax1.set_title('GPU Latency vs Batch Size')
-    ax1.legend()
+    ax1.set_xlabel('Batch Size', fontsize=12)
+    ax1.set_ylabel('GPU Latency (ms)', fontsize=12)
+    ax1.set_title('GPU Latency vs Batch Size', fontsize=14, fontweight='bold')
+    ax1.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     ax1.grid(True, alpha=0.3)
     
     # CPU Latency (if available)
@@ -260,141 +289,171 @@ def plot_latency_vs_batch_size(df):
     if not cpu_data.empty:
         for (precision, replaced_conv), group in cpu_data.groupby(['precision', 'has_replaced_conv']):
             label = f"{precision} {'ReplacedConv' if replaced_conv else 'Standard'}"
+            style = style_map[(precision, replaced_conv)]
+            
             ax2.plot(group['batch_size'], group['latency_cpu_ms'], 
-                    marker='s', label=label, linewidth=2)
+                    label=label,
+                    marker=style['marker'],
+                    linestyle=style['linestyle'],
+                    color=style['color'],
+                    alpha=style['alpha'],
+                    linewidth=style['linewidth'],
+                    markersize=6,
+                    markeredgewidth=0.5,
+                    markeredgecolor='white')
         
-        ax2.set_xlabel('Batch Size')
-        ax2.set_ylabel('CPU Latency (ms)')
-        ax2.set_title('CPU Latency vs Batch Size')
-        ax2.legend()
+        ax2.set_xlabel('Batch Size', fontsize=12)
+        ax2.set_ylabel('CPU Latency (ms)', fontsize=12)
+        ax2.set_title('CPU Latency vs Batch Size', fontsize=14, fontweight='bold')
+        ax2.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         ax2.grid(True, alpha=0.3)
+    else:
+        ax2.set_visible(False)
     
     plt.tight_layout()
     return fig
 
 def plot_accuracy_vs_latency(df):
     """Plot accuracy vs latency trade-off"""
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+    fig, ax = plt.subplots(1, 1, figsize=(20, 8))
     
-    colors = plt.cm.Set1(np.linspace(0, 1, len(df['precision'].unique())))
-    markers = ['o', 's', '^', 'D', 'v']
+    unique_combinations = df[['has_replaced_conv', 'precision']].drop_duplicates()
+    num_combinations = len(unique_combinations)
     
-    for i, (precision, precision_group) in enumerate(df.groupby('precision')):
-        marker = markers[i % len(markers)]
+    # Use a more distinct color palette
+    colors = plt.cm.tab10(np.linspace(0, 1, min(10, num_combinations)))
+    if num_combinations > 10:
+        colors = plt.cm.tab20(np.linspace(0, 1, num_combinations))
+    
+    markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*', 'h', 'X', 'd']
+    
+    # Create style mapping
+    color_map = {}
+    marker_map = {}
+    style_map = {}
+    
+    for idx, (_, row) in enumerate(unique_combinations.iterrows()):
+        conv_type = 'ReplacedConv' if row['has_replaced_conv'] else 'Standard'
+        key = (row['has_replaced_conv'], row['precision'])
+        color_map[key] = colors[idx % len(colors)]
+        marker_map[key] = markers[idx % len(markers)]
         
-        for j, (replaced_conv, model_group) in enumerate(precision_group.groupby('has_replaced_conv')):
-            color = colors[i]
-            label = f"{precision} {'ReplacedConv' if replaced_conv else 'Standard'}"
-            
-            ax1.scatter(model_group['latency_gpu_mean_ms'], model_group['val_iou'],
-                       c=[color], marker=marker, s=100, label=label, alpha=0.7)
-            ax2.scatter(model_group['latency_gpu_mean_ms'], model_group['test_iou'],
-                       c=[color], marker=marker, s=100, label=label, alpha=0.7)
+        # Add some line styles for connecting points
+        line_styles = ['-', '--', '-.', ':']
+        style_map[key] = line_styles[idx % len(line_styles)]
     
-    ax1.set_xlabel('GPU Latency (ms)')
-    ax1.set_ylabel('Validation IoU')
-    ax1.set_title('Validation Accuracy vs Latency')
-    ax1.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    ax1.grid(True, alpha=0.3)
+    # Plot data with improved styling
+    for (has_replaced_conv, precision), group in df.groupby(['has_replaced_conv', 'precision']):
+        conv_type = 'ReplacedConv' if has_replaced_conv else 'Standard'
+        label = f"{conv_type} ({precision})"
+        color = color_map[(has_replaced_conv, precision)]
+        marker = marker_map[(has_replaced_conv, precision)]
+        line_style = style_map[(has_replaced_conv, precision)]
+        
+        # Sort by batch size for better line connections
+        group = group.sort_values('batch_size')
+        
+        # Plot connecting lines (thinner and transparent)
+        ax.plot(group['latency_gpu_mean_ms'], group['test_iou'],
+                color=color, linestyle=line_style, linewidth=1.2, alpha=0.8,
+                label='_nolegend_')  # Don't show lines in legend
+        
+        # Plot scatter points with better styling
+        ax.scatter(group['latency_gpu_mean_ms'], group['test_iou'],
+                  c=[color], marker=marker, s=80, label=label, alpha=0.8,
+                  edgecolors='white', linewidth=1.0,  # White borders for better visibility
+                  zorder=5)  # Ensure points are on top of lines
     
-    ax2.set_xlabel('GPU Latency (ms)')
-    ax2.set_ylabel('Test IoU')
-    ax2.set_title('Test Accuracy vs Latency')
-    ax2.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    ax2.grid(True, alpha=0.3)
+    ax.set_xlabel('GPU Latency (ms)', fontsize=12)
+    ax.set_ylabel('Test IoU', fontsize=12)
+    ax.set_title('Test Accuracy vs Latency\n(Colors by Conv Type + Precision)', 
+                 fontsize=14, fontweight='bold', pad=20)
+    
+    # Improve legend
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', 
+              framealpha=0.5, edgecolor='gray')
+    
+    ax.grid(True, alpha=0.3)
+    
+    # Optional: Add annotations for batch sizes
+    for _, row in df.iterrows():
+        ax.annotate(f"B{int(row['batch_size'])}", 
+                   (row['latency_gpu_mean_ms'], row['test_iou']),
+                   xytext=(5, 5), textcoords='offset points',
+                   fontsize=6, alpha=0.9)
     
     plt.tight_layout()
     return fig
+
 
 def plot_accuracy_vs_latency_cpu(df):
     """Plot accuracy vs latency trade-off"""
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+    fig, ax = plt.subplots(1, 1, figsize=(20, 8))
     
-    colors = plt.cm.Set1(np.linspace(0, 1, len(df['precision'].unique())))
-    markers = ['o', 's', '^', 'D', 'v']
+    unique_combinations = df[['has_replaced_conv', 'precision']].drop_duplicates()
+    num_combinations = len(unique_combinations)
     
-    for i, (precision, precision_group) in enumerate(df.groupby('precision')):
-        marker = markers[i % len(markers)]
+    # Use a more distinct color palette
+    colors = plt.cm.tab10(np.linspace(0, 1, min(10, num_combinations)))
+    if num_combinations > 10:
+        colors = plt.cm.tab20(np.linspace(0, 1, num_combinations))
+    
+    markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*', 'h', 'X', 'd']
+    
+    # Create style mapping
+    color_map = {}
+    marker_map = {}
+    style_map = {}
+    
+    for idx, (_, row) in enumerate(unique_combinations.iterrows()):
+        conv_type = 'ReplacedConv' if row['has_replaced_conv'] else 'Standard'
+        key = (row['has_replaced_conv'], row['precision'])
+        color_map[key] = colors[idx % len(colors)]
+        marker_map[key] = markers[idx % len(markers)]
         
-        for j, (replaced_conv, model_group) in enumerate(precision_group.groupby('has_replaced_conv')):
-            color = colors[i]
-            label = f"{precision} {'ReplacedConv' if replaced_conv else 'Standard'}"
-            
-            ax1.scatter(model_group['latency_cpu_ms'], model_group['val_iou'],
-                       c=[color], marker=marker, s=100, label=label, alpha=0.7)
-            ax2.scatter(model_group['latency_cpu_ms'], model_group['test_iou'],
-                       c=[color], marker=marker, s=100, label=label, alpha=0.7)
+        # Add some line styles for connecting points
+        line_styles = ['-', '--', '-.', ':']
+        style_map[key] = line_styles[idx % len(line_styles)]
     
-    ax1.set_xlabel('CPU Latency (ms)')
-    ax1.set_ylabel('Validation IoU')
-    ax1.set_title('Validation Accuracy vs Latency')
-    ax1.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    ax1.grid(True, alpha=0.3)
-    
-    ax2.set_xlabel('CPU Latency (ms)')
-    ax2.set_ylabel('Test IoU')
-    ax2.set_title('Test Accuracy vs Latency')
-    ax2.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    ax2.grid(True, alpha=0.3)
-    
-    plt.tight_layout()
-    return fig
-
-def plot_precision_comparison(df, metric='latency_gpu_mean_ms'):
-    """Compare different precisions for the same model type"""
-    fig, axes = plt.subplots(2, 2, figsize=(15, 12))
-    axes = axes.flatten()
-    
-    comparisons = [
-        ('Standard Conv', False),
-        ('ReplacedConv', True)
-    ]
-    
-    for idx, (title, replaced_conv) in enumerate(comparisons):
-        if idx >= len(axes):
-            break
-            
-        model_data = df[df['has_replaced_conv'] == replaced_conv]
+    # Plot data with improved styling
+    for (has_replaced_conv, precision), group in df.groupby(['has_replaced_conv', 'precision']):
+        conv_type = 'ReplacedConv' if has_replaced_conv else 'Standard'
+        label = f"{conv_type} ({precision})"
+        color = color_map[(has_replaced_conv, precision)]
+        marker = marker_map[(has_replaced_conv, precision)]
+        line_style = style_map[(has_replaced_conv, precision)]
         
-        # Latency comparison
-        sns.barplot(data=model_data, x='precision', y='latency_gpu_mean_ms', 
-                   hue='batch_size', ax=axes[idx])
-        axes[idx].set_title(f'{title} - GPU Latency by Precision')
-        axes[idx].set_ylabel('Latency (ms)')
-        axes[idx].tick_params(axis='x', rotation=45)
+        # Sort by batch size for better line connections
+        group = group.sort_values('batch_size')
         
-        # Accuracy comparison
-        if idx + 2 < len(axes):
-            sns.barplot(data=model_data, x='precision', y='test_iou',
-                       hue='batch_size', ax=axes[idx + 2])
-            axes[idx + 2].set_title(f'{title} - Test IoU by Precision')
-            axes[idx + 2].set_ylabel('Test IoU')
-            axes[idx + 2].tick_params(axis='x', rotation=45)
+        # Plot connecting lines (thinner and transparent)
+        ax.plot(group['latency_cpu_ms'], group['test_iou'],
+                color=color, linestyle=line_style, linewidth=1.2, alpha=0.8,
+                label='_nolegend_')  # Don't show lines in legend
+        
+        # Plot scatter points with better styling
+        ax.scatter(group['latency_cpu_ms'], group['test_iou'],
+                  c=[color], marker=marker, s=80, label=label, alpha=0.8,
+                  edgecolors='white', linewidth=1.0,  # White borders for better visibility
+                  zorder=5)  # Ensure points are on top of lines
     
-    plt.tight_layout()
-    return fig
-
-def plot_latency_std_deviation(df):
-    """Plot latency standard deviation across different configurations"""
-    fig, ax = plt.subplots(figsize=(12, 8))
+    ax.set_xlabel('CPU Latency (ms)', fontsize=12)
+    ax.set_ylabel('Test IoU', fontsize=12)
+    ax.set_title('Test Accuracy vs Latency\n(Colors by Conv Type + Precision)', 
+                 fontsize=14, fontweight='bold', pad=20)
     
-    # Create combined labels for x-axis
-    df['config'] = df['precision'] + '_' + df['batch_size'].astype(str) + '_' + df['has_replaced_conv'].astype(str)
+    # Improve legend
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', 
+              framealpha=0.9, edgecolor='gray')
     
-    # Plot mean latency with error bars
-    x_pos = range(len(df))
-    ax.errorbar(x_pos, df['latency_gpu_mean_ms'], 
-                yerr=df['latency_gpu_std_ms'], 
-                fmt='o', capsize=5, capthick=2,
-                label='Mean ± Std Dev')
-    
-    ax.set_xlabel('Configuration (Precision_BatchSize_ReplacedConv)')
-    ax.set_ylabel('GPU Latency (ms)')
-    ax.set_title('GPU Latency with Standard Deviation')
-    ax.set_xticks(x_pos)
-    ax.set_xticklabels(df['config'], rotation=45, ha='right')
     ax.grid(True, alpha=0.3)
-    ax.legend()
+    
+    # Optional: Add annotations for batch sizes
+    for _, row in df.iterrows():
+        ax.annotate(f"B{int(row['batch_size'])}", 
+                   (row['latency_cpu_ms'], row['test_iou']),
+                   xytext=(5, 5), textcoords='offset points',
+                   fontsize=6, alpha=0.7)
     
     plt.tight_layout()
     return fig
@@ -433,9 +492,8 @@ def analyze_benchmark_data(csv_file_path):
     plots['accuracy_vs_latency'] = plot_accuracy_vs_latency(df)
 
     plots['accuracy_vs_latency_cpu'] = plot_accuracy_vs_latency_cpu(df)
-    plots['precision_comparison'] = plot_precision_comparison(df)
-    plots['latency_std'] = plot_latency_std_deviation(df)
-    
+    # plots['precision_comparison'] = plot_precision_comparison(df)
+
     # Create summary table
     summary = create_summary_table(df)
     
