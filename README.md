@@ -184,6 +184,21 @@ int8 custom cfg:
 
 <img width="320" height="320" alt="image" src="https://github.com/user-attachments/assets/d5ab23dd-8003-41df-a8d2-f413755bce4a" />
 
+#### CPU Latency vs Batch Size:
+
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/458c1092-403d-4820-b908-0113e48239c7" />
+
+#### GPU Latency vs Batch Size:
+
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/1d93dc58-3b8b-4ea5-bbda-15138bea7c1e" />
+
+#### Test Accuracy vs Latency (CPU latency):
+
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/3bc3e44b-c1f6-483d-b5d5-3047255528b3" />
+
+#### Test Accuracy vs Latency (GPU latency):
+
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/77d55853-e958-471d-a8af-12f432be935f" />
 
 ### Воспроизведение результатов
 
