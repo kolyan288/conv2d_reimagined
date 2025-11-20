@@ -33,7 +33,7 @@ EPOCHS = 50
 #     return masks
 
 class CamVidModel(pl.LightningModule):
-    def __init__(self, arch, encoder_name, in_channels, out_classes, **kwargs):
+    def __init__(self, arch, encoder_name, in_channels, out_classes, iterative_pruner=None,**kwargs):
         super().__init__()
         self.model = smp.create_model(
             arch,
@@ -57,6 +57,8 @@ class CamVidModel(pl.LightningModule):
         self.training_step_outputs = []
         self.validation_step_outputs = []
         self.test_step_outputs = []
+
+        self.iterative_pruner = iterative_pruner
 
     def forward_model(self, x):
         """Sequentially pass `x` trough model`s encoder, decoder and heads"""
@@ -162,6 +164,18 @@ class CamVidModel(pl.LightningModule):
         train_loss_info = self.shared_step(batch, "train")
         self.training_step_outputs.append(train_loss_info)
         return train_loss_info
+    
+    def on_train_epoch_start(self):
+        if self.iterative_pruner is not None:
+            current_sparsity = self.iterative_pruner.prune_step(self.model)
+            print(f"Pruning step applied at epoch {self.current_epoch} start. Current sparsity: {current_sparsity:.4f}")
+
+    def on_after_backward(self):
+        for name, module in self.model.named_modules():
+            if hasattr(module, 'weight_mask'):
+                if module.weight.grad is not None:
+                    module.weight.grad.data *= module.weight_mask
+
 
     def on_train_epoch_end(self):
         self.shared_epoch_end(self.training_step_outputs, "train")
