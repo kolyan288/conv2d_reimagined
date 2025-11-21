@@ -4,6 +4,7 @@ import numpy as np
 import albumentations as A
 
 import pytorch_lightning as pl
+from pytorch_lightning.callbacks import Callback
 import segmentation_models_pytorch as smp
 import torch
 from torch.optim import lr_scheduler
@@ -32,8 +33,14 @@ EPOCHS = 50
 
 #     return masks
 
+class MaskApplyCallback(Callback):
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):        
+        for name, module in pl_module.model.named_modules():
+            if hasattr(module, 'weight_mask'):
+                module.weight.data = module.weight.data * module.weight_mask
+
 class CamVidModel(pl.LightningModule):
-    def __init__(self, arch, encoder_name, in_channels, out_classes, **kwargs):
+    def __init__(self, arch, encoder_name, in_channels, out_classes, pruner=None,**kwargs):
         super().__init__()
         self.model = smp.create_model(
             arch,
@@ -57,6 +64,8 @@ class CamVidModel(pl.LightningModule):
         self.training_step_outputs = []
         self.validation_step_outputs = []
         self.test_step_outputs = []
+
+        self.pruner = pruner
 
     def forward_model(self, x):
         """Sequentially pass `x` trough model`s encoder, decoder and heads"""
@@ -162,6 +171,11 @@ class CamVidModel(pl.LightningModule):
         train_loss_info = self.shared_step(batch, "train")
         self.training_step_outputs.append(train_loss_info)
         return train_loss_info
+    
+    def on_train_epoch_start(self):
+        if self.pruner is not None:
+            current_sparsity = self.pruner.prune_step(self.model)
+            print(f"Pruning step applied at epoch {self.current_epoch} start. Current sparsity: {current_sparsity:.4f}")
 
     def on_train_epoch_end(self):
         self.shared_epoch_end(self.training_step_outputs, "train")
@@ -414,44 +428,49 @@ def train_val(
     valid_loader,
     test_loader,
     max_epochs=EPOCHS,
-    fp16 = False,
-    train = True,
+    fp16=False,
+    train=True,
     log_every_n_steps=1,
-    test = False,
-    callbacks = None,
-    force_cpu = False
-   
+    test=False,
+    callbacks=None,
+    force_cpu=False
 ):
     accelerator = "cpu" if force_cpu else "auto"
+    
+    if callbacks is None:
+        callbacks = []
+    
     if fp16:
         trainer = pl.Trainer(
             max_epochs=max_epochs,
             log_every_n_steps=log_every_n_steps,
-            precision=16, callbacks=callbacks, accelerator=accelerator
+            precision=16,
+            callbacks=callbacks,
+            accelerator=accelerator
         )
-
     else:
-        trainer = pl.Trainer(max_epochs=max_epochs, log_every_n_steps=log_every_n_steps, callbacks=callbacks, accelerator=accelerator)
-    """
-    O1 and O2 are different implementations of mixed precision. Try both, and see what gives the best speedup and accuracy for your model.
-    """
+        trainer = pl.Trainer(
+            max_epochs=max_epochs,
+            log_every_n_steps=log_every_n_steps,
+            callbacks=callbacks,
+            accelerator=accelerator
+        )
+    
     if train:
         trainer.fit(
             model,
             train_dataloaders=train_loader,
             val_dataloaders=valid_loader,
         )
-
-    # run validation dataset
+    
     valid_metrics = trainer.validate(model, dataloaders=valid_loader, verbose=False)
-    print(valid_metrics)
-
-    # run test dataset
+    
     test_metrics = None
     if test:
         test_metrics = trainer.test(model, dataloaders=test_loader, verbose=False)
-        print(test_metrics)
+    
     return valid_metrics, test_metrics, trainer
+
 
 
 def get_dataloaders(

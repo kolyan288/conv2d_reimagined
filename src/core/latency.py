@@ -71,6 +71,32 @@ def latency_cpu_profiler(model, test_input, warmup_n=10, benchmark_n=100):
 
     return prof
 
+# def latency_cpu_profiler(model, test_input, warmup_n=10, benchmark_n=100):
+#     model.to("cpu")
+#     model.eval()
+#     test_input = test_input.to("cpu") if test_input is not None else None
+
+#     with torch.no_grad():
+#         for _ in range(warmup_n):
+#             _ = model(test_input)
+
+#     with profile(
+#         activities=[
+#             torch.profiler.ProfilerActivity.CPU,
+#         ],
+#         record_shapes=True,
+#         profile_memory=True,
+#         use_cuda=False,
+#     ) as prof:
+#         with torch.no_grad():
+#             for _ in range(benchmark_n):
+#                 with record_function("model_inference"):
+#                     model(test_input)
+#                 prof.step()
+
+#     return prof
+
+
 
 def latency_gpu_event(model, example_inputs, warmup=50, repeat=300):
     model.to(device)
