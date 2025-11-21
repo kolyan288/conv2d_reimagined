@@ -53,8 +53,11 @@ class MagnitudePruner:
         for name, module in model.named_modules():
             if layer_names is not None and name not in layer_names:
                 continue
-
-            if isinstance(module, (nn.Conv2d, Conv2dImg2Col, nn.Linear)) and hasattr(module, 'weight'):
+            
+            is_conv = isinstance(module, nn.Conv2d) or type(module).__name__ == 'Conv2dImg2Col'
+            is_linear = isinstance(module, nn.Linear)
+            
+            if (is_conv or is_linear) and hasattr(module, 'weight'):
                 weight = module.weight.data
 
                 if self.structured and isinstance(module, nn.Conv2d):

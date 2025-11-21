@@ -24,7 +24,8 @@ conv2d_reimagined
 │   │   └── replace_conv_resnet.py     # Утилиты замены свёрточных слоёв
 │   ├── conv2d_img2col_QAT.py          # Квантованный Img2Col (QAT)
 │   ├── quantize.ipynb                 # Эксперименты по квантизации
-│   └── [coming soon] pruning/         # Эксперименты со спарсификацией
+│   └── prune.py                       # Реализация классов прунинга
+│   └── pruning_benchmark.ipynb        # Эксперименты со спарсификацией
 ├── setup/
 │   └── setup-gpu.sh                   # Установка необходимых зависимостей
 ├── src/
@@ -54,7 +55,11 @@ conv2d_reimagined
 
 ### 3. Спарсификация
 
-coming soon...
+Файл: experiments/prune.py
+
+Классы: MagnitudePruner, IterativePruner
+
+Особенности: Модификация итеративного прунинга, которая позволяет фиксировать sparsity на несколько эпох перед ее повышением
 
 ### 4. Измерение производительности
 Файл: src/core/latency.py
@@ -200,9 +205,46 @@ int8 custom cfg:
 
 <img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/77d55853-e958-471d-a8af-12f432be935f" />
 
+### Экспериментальная часть - /experiments/pruning_benchmark.ipynb
+
+Пайплайн в большинстве своем случае дублирует пайплайн квантизиции за исключением наличия файн тюнинга моделей и логики итеративного прунинга
+
+#### Результаты экспериментов с исходным Conv2D слоем:
+
+{'method': 'MagnitudePruner', 'sparsity': 0.3, 'structured': False, 'epochs': 5}
+
+{'method': 'MagnitudePruner', 'sparsity': 0.3, 'structured': True, 'epochs': 5}
+
+{'method': 'MagnitudePruner', 'sparsity': 0.5, 'structured': False, 'epochs': 5}
+
+{'method': 'MagnitudePruner', 'sparsity': 0.5, 'structured': True, 'epochs': 5}
+
+{'method': 'MagnitudePruner', 'sparsity': 0.7, 'structured': False, 'epochs': 5}
+
+{'method': 'MagnitudePruner', 'sparsity': 0.7, 'structured': True, 'epochs': 5}
+
+{'method': 'IterativePruner', 'sparsity': 0.5, 'structured': False, 'epochs': 8}
+
+{'method': 'IterativePruner', 'sparsity': 0.5, 'structured': True, 'epochs': 8}
+
+{'method': 'IterativePruner', 'sparsity': 0.7, 'structured': False, 'epochs': 8}
+
+{'method': 'IterativePruner', 'sparsity': 0.7, 'structured': True, 'epochs': 8}
+
+
+#### Результаты экспериментов Conv2dImg2Col:
+
+#### CPU Latency vs Batch Size:
+
+#### GPU Latency vs Batch Size:
+
+#### Test Accuracy vs Latency (CPU latency):
+
+#### Test Accuracy vs Latency (GPU latency):
+
 ### Воспроизведение результатов
 
-См. раздел с настройкой окружения и экспериментальной частью (файл /experiments/quantize.ipynb)
+См. раздел с настройкой окружения и экспериментальной частью (файл /experiments/quantize.ipynb и /experiments/pruning_benchmark.ipynb (при наличии базовых моделей без квантизации))
 
 ## Технические детали
 ### Требования к оборудованию
