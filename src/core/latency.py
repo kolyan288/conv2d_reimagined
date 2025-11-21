@@ -47,29 +47,55 @@ def latency_cpu(model, test_input=None, warmup_n=10, benchmark_n=100):
     return mean_ms, std_ms
 
 
+# def latency_cpu_profiler(model, test_input, warmup_n=10, benchmark_n=100):
+#     # ProfilerActivity.CPU, ProfilerActivity.CUDA
+#     model.to("cpu")
+#     test_input = test_input.to("cpu") if test_input is not None else None
+
+#     with profile(
+#         activities=[
+#             torch.profiler.ProfilerActivity.CPU,
+#             # torch.profiler.ProfilerActivity.CUDA,
+#         ],
+#         record_shapes=True,
+#         profile_memory=True,
+#         use_cuda=False,
+#         # schedule=schedule(wait=1, warmup=warmup_n, active=30, repeat=10),
+#     ) as prof:
+#         with record_function("model_inference"): 
+#             model(test_input)
+#         # for i in range(benchmark_n):
+#         #     with torch.no_grad():
+#         #         model(test_input)
+#         #     prof.step()
+
+#     return prof
+
 def latency_cpu_profiler(model, test_input, warmup_n=10, benchmark_n=100):
-    # ProfilerActivity.CPU, ProfilerActivity.CUDA
     model.to("cpu")
+    model.eval()
     test_input = test_input.to("cpu") if test_input is not None else None
+
+    with torch.no_grad():
+        for _ in range(warmup_n):
+            _ = model(test_input)
 
     with profile(
         activities=[
             torch.profiler.ProfilerActivity.CPU,
-            # torch.profiler.ProfilerActivity.CUDA,
         ],
         record_shapes=True,
         profile_memory=True,
         use_cuda=False,
-        # schedule=schedule(wait=1, warmup=warmup_n, active=30, repeat=10),
     ) as prof:
-        with record_function("model_inference"): 
-            model(test_input)
-        # for i in range(benchmark_n):
-        #     with torch.no_grad():
-        #         model(test_input)
-        #     prof.step()
+        with torch.no_grad():
+            for _ in range(benchmark_n):
+                with record_function("model_inference"):
+                    model(test_input)
+                prof.step()
 
     return prof
+
 
 
 def latency_gpu_event(model, example_inputs, warmup=50, repeat=300):
